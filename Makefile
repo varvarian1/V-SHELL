@@ -3,15 +3,20 @@ CC = gcc
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 TARGET = v-shell
+
 CFLAGS = -Wall -Wextra -O2
 LDFLAGS = -lreadline -lhistory
+
+ifdef DEBUG
+	CFLAGS = -Wall -Wextra -g -O0 -DDEBUG -fsanitize=address
+	LDFLAGS += -fsanitize=address
+endif
 
 SRCS = src/main.c \
        src/lexer.c \
 	   src/parser.c \
 	   src/executor.c \
-	   src/prompt.c
-	
+	   src/prompt.c	
 OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)
@@ -35,4 +40,4 @@ rebuild:
 	make clean
 	make all
 
-.PHONY: all install uninstall clean
+.PHONY: all install uninstall clean rebuild

@@ -179,8 +179,15 @@ static ASTNode *parse_command(ParserState *ps) {
         advance(ps);
         char *filename = strdup(tok->value);
 
+        int target_fd;
+        if (mode == 0) {
+            target_fd = 0;
+        } else {
+            target_fd = 1;
+        }
+
         /* wrap the existing node with a redirect node */
-        ASTNode *new_node = new_redirect_node(node, 0, filename, mode);
+        ASTNode *new_node = new_redirect_node(node, target_fd, filename, mode);
         node = new_node;
     }
 
