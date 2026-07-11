@@ -28,10 +28,20 @@ int execute(ASTNode *node) {
             return execute_pipeline(node);
         case NODE_REDIRECT:
             return execute_redirect(node);
-        case NODE_AND:
-            return execute(node->data.binary.left) == 0 && execute(node->data.binary.right) == 0;
-        case NODE_OR:
-            return execute(node->data.binary.left) == 0 || execute(node->data.binary.right) == 0;
+        case NODE_AND: {
+            int left_ret = execute(node->data.binary.left);
+            if (left_ret != 0) {
+                return left_ret;
+            }
+            return execute(node->data.binary.right);
+        }
+        case NODE_OR: {
+            int left_ret = execute(node->data.binary.left);
+            if (left_ret == 0) {
+                return 0;
+            }
+            return execute(node->data.binary.right);
+        }
         case NODE_SEMICOLON:
             execute(node->data.binary.left);
             return execute(node->data.binary.right);
