@@ -9,6 +9,7 @@
 #include "../include/parser.h"
 #include "../include/executor.h"
 #include "../include/prompt.h"
+#include "../include/symbol.h"
 
 void handle_sigint(int sig) {
     (void)sig;
@@ -18,14 +19,21 @@ void handle_sigint(int sig) {
     rl_redisplay();
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+    import_environment();
+
+    /* if a script file is given, execute it and exit */
+    if (argc > 1) {
+        return execute_script(argv[1], argc-2, &argv[2]);
+    }
+    
     signal(SIGINT, handle_sigint);
     using_history();
 
     char *input;
     while (1) {
-	const char *prompt = get_prompt();
-	char *input = readline(prompt);
+	    const char *prompt = get_prompt();
+	    input = readline(prompt);
 
         if (!input) {
             printf("exit\n");
@@ -40,7 +48,7 @@ int main(void) {
             if (tokens) {
                 ASTNode *ast = parse(tokens, tokenCount);
                 if (ast) {
-                    int status = execute(ast);
+                    (void)execute(ast);
                     free_ast(ast);
                 } else {
                     printf("Syntax error!\n");

@@ -16,7 +16,8 @@ SRCS = src/main.c \
        src/lexer.c \
 	   src/parser.c \
 	   src/executor.c \
-	   src/prompt.c	
+	   src/prompt.c	\
+	   src/symbol.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)

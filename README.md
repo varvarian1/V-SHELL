@@ -6,6 +6,13 @@ V-SHELL is a lightweight command-line interpreter (shell) written in C.
 
 - **Built-in commands**: `cd`, `exit`, `echo`, `pwd`
 - **Pipelines**(`|`) - connect the output of one command to the input of another
+- **Redirections**:
+	- `>` - overwrite a file
+	- `>>` - append to a file
+	- `<` - read from a file
+- **Logical operators**:
+	- `&&` - execute the right side only if the left succeeds
+	- `||` - execute the right side only if the left fails
 
 ### Requirements
 
@@ -36,13 +43,6 @@ sudo make uninstall
 - Tab completion
 - Environment variables
 - Heredoc `<<` support
-- Redirections: 
-    - `>` - overwrite a file
-    - `>>` - append to a file
-    - `<` - read from a file
-- Logical operators:
-    - `&&` - execute the right side only if the left succeeds
-    - `||` - execute the right side only if the left fails
 
 ### License
 This project is licensed. See LICENSE.md

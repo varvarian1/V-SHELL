@@ -36,6 +36,10 @@ CharCategory translate(int ch) {
     }
 }
 
+static char *safe_strdup(const char *str) {
+    return str ? strdup(str) : NULL;
+}
+
 Token *tokenize(const char *input, int *tokenCount) {
     Token *tokens = NULL;
     int count = 0, capacity = 0;
@@ -59,7 +63,11 @@ Token *tokenize(const char *input, int *tokenCount) {
             tokens = realloc(tokens, capacity * sizeof(Token)); \
         }                                                       \
         tokens[count].type = (tok_type);                        \
-        tokens[count].value = (val) ? strdup(val) : NULL;       \
+        if (val) {                                              \
+            tokens[count].value = safe_strdup(val);             \
+        } else {                                                \
+            tokens[count].value = NULL;                         \
+        }                                                       \
         count++;                                                \
     } while(0)
 
@@ -101,7 +109,7 @@ Token *tokenize(const char *input, int *tokenCount) {
                 } else if (category == CHAR_DOLLAR) {
                     APPEND(ch);
                     position++;
-                    state = STATE_IN_VARIABLE;
+                    state = STATE_IN_WORD;
                 } else if (category == CHAR_QUOTE_SINGLE) {
                     position++;
                     state = STATE_IN_SINGLE_QUOTE;
@@ -159,7 +167,6 @@ Token *tokenize(const char *input, int *tokenCount) {
                 } else if (category == CHAR_DOLLAR) {
                     APPEND(ch);
                     position++;
-                    state = STATE_IN_VARIABLE;
                 } else {
                     FINISH_WORD();
                     state = STATE_GENERAL;
@@ -186,7 +193,6 @@ Token *tokenize(const char *input, int *tokenCount) {
                 } else if (category == CHAR_DOLLAR) {
                     APPEND(ch);
                     position++;
-                    state = STATE_IN_VARIABLE;
                 } else {
                     APPEND(ch);
                     position++;
@@ -197,32 +203,6 @@ Token *tokenize(const char *input, int *tokenCount) {
                 APPEND(ch);
                 position++;
                 state = (previousState == STATE_GENERAL ? STATE_GENERAL : STATE_IN_WORD);
-                break;
-
-            case STATE_IN_VARIABLE:
-                if (category == CHAR_GENERAL && (isalnum(ch) || ch == '_')) {
-                    APPEND(ch);
-                    position++;
-                } else if (category == CHAR_LBRACE) {  /* ${VAR} syntax */
-                    APPEND(ch);
-                    position++;
-                    state = STATE_IN_BRACE;
-                } else {
-                    FINISH_WORD();
-                    state = STATE_GENERAL;
-                }
-                break;
-
-            case STATE_IN_BRACE:
-                if (category == CHAR_RBRACE) {
-                    APPEND(ch);
-                    position++;
-                    FINISH_WORD();
-                    state = STATE_GENERAL;
-                } else {
-                    APPEND(ch);
-                    position++;
-                }
                 break;
 
             case STATE_IN_AND:

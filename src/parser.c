@@ -73,6 +73,19 @@ ASTNode *parse(Token *tokens, int tokenCount) {
     return node;
 }
 
+ASTNode *parse_line(const char *line) {
+    int tokenCount = 0;
+    Token *tokens = tokenize(line, &tokenCount);
+    if (!tokens) {
+        return NULL;
+    }
+
+    ASTNode *ast = parse(tokens, tokenCount);
+    free_tokens(tokens, tokenCount);
+
+    return ast;
+}
+
 static ASTNode *parse_list(ParserState *ps) {
     ASTNode *left = parse_pipeline(ps);
     if (!left) {
