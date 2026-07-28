@@ -10,6 +10,7 @@
 #include "../include/executor.h"
 #include "../include/prompt.h"
 #include "../include/symbol.h"
+#include "../include/history.h"
 
 void handle_sigint(int sig) {
     (void)sig;
@@ -42,6 +43,7 @@ int main(int argc, char **argv) {
 
         if (*input) {
             add_history(input);
+            add_command_to_history(input);
 
             int tokenCount;
             Token *tokens = tokenize(input, &tokenCount);

@@ -8,6 +8,7 @@
 
 #include "../include/executor.h"
 #include "../include/symbol.h"
+#include "../include/history.h"
 
 /* Base value for exit status when a process is terminated by a signal.
  * Status = 128 + signal_number (as in POSIX shells).
@@ -164,6 +165,11 @@ static int execute_command(ASTNode *node) {
             return 1;
         }
         
+        free_expanded_argv(expanded_argv, argc);
+        return 0;
+    }
+    if (strcmp(argv[0], "history") == 0) {
+        show_shell_history();
         free_expanded_argv(expanded_argv, argc);
         return 0;
     }
