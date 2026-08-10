@@ -4,6 +4,9 @@
 
 #include "../include/lexer.h"
 
+static char *safe_strdup(const char *str);
+static TokenType get_keyword_type(const char *word);
+
 CharCategory translate(int ch) {
     switch (ch) {
         case ' ':
@@ -34,10 +37,6 @@ CharCategory translate(int ch) {
         case 0: return CHAR_EOF;
         default: return CHAR_GENERAL;
     }
-}
-
-static char *safe_strdup(const char *str) {
-    return str ? strdup(str) : NULL;
 }
 
 Token *tokenize(const char *input, int *tokenCount) {
@@ -72,13 +71,14 @@ Token *tokenize(const char *input, int *tokenCount) {
     } while(0)
 
     /* finalizes the current word token and adds it to tokens list */
-    #define FINISH_WORD() do {        \
-        if (lexem && lexemLen > 0) {  \
-            ADD_TOKEN(TOKEN_WORD, lexem); \
-            free(lexem);              \
-            lexem = NULL;             \
-            lexemLen = 0;             \
-        }                             \
+    #define FINISH_WORD() do {                        \
+        if (lexem && lexemLen > 0) {                  \
+            TokenType type = get_keyword_type(lexem); \
+            ADD_TOKEN(type, lexem);                   \
+            free(lexem);                              \
+            lexem = NULL;                             \
+            lexemLen = 0;                             \
+        }                                             \
     } while(0)
 
     const char *position = input;
@@ -89,14 +89,13 @@ Token *tokenize(const char *input, int *tokenCount) {
 
         switch (state) {
             case STATE_GENERAL:
-                if (category == CHAR_WHITESPACE || category == CHAR_NEWLINE) {
-                    if (ch == '\n') {
-                        line++;
-                        column = 1;
-                    } else {
-                        column++;
-                    }
-
+                if (category == CHAR_WHITESPACE) {
+                    position++;
+                    continue;
+                }
+                if (category == CHAR_NEWLINE) {
+                    line++;
+                    column = 1;
                     position++;
                     continue;
                 }
@@ -290,6 +289,26 @@ finish:
 #undef APPEND
 #undef ADD_TOKEN
 #undef FINISH_WORD
+}
+
+static TokenType get_keyword_type(const char *word) {
+    if (strcmp(word, "if") == 0) {
+        return TOKEN_IF;
+    }
+    if (strcmp(word, "then") == 0) {
+        return TOKEN_THEN;
+    }
+    if (strcmp(word, "else") == 0) {
+        return TOKEN_ELSE;
+    }
+    if (strcmp(word, "fi") == 0) {
+        return TOKEN_FI;
+    }
+    return TOKEN_WORD;
+}
+
+static char *safe_strdup(const char *str) {
+    return str ? strdup(str) : NULL;
 }
 
 void free_tokens(Token *tokens, int count) {

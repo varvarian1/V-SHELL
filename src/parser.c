@@ -7,11 +7,20 @@
 static ASTNode *parse_list(ParserState *ps);
 static ASTNode *parse_pipeline(ParserState *ps);
 static ASTNode *parse_command(ParserState *ps);
+static ASTNode *parse_if(ParserState *ps);
 
 /* returns current token without consuming it */
 static Token *peek(ParserState *ps) {
     if (ps->pos < ps->count) {
         return &ps->tokens[ps->pos];
+    }
+    return NULL;
+}
+
+/* returns next token without consuming it */
+static Token *peek_next(ParserState *ps) {
+    if (ps->pos + 1 < ps->count) {
+        return &ps->tokens[ps->pos + 1];
     }
     return NULL;
 }
@@ -87,38 +96,67 @@ ASTNode *parse_line(const char *line) {
 }
 
 static ASTNode *parse_list(ParserState *ps) {
-    ASTNode *left = parse_pipeline(ps);
-    if (!left) {
-        return NULL;
-    }
+    ASTNode *left = NULL;
     
     while (1) {
         Token *tok = peek(ps);
         if (!tok) {
             break;
         }
-
-        NodeType type;
-        if (tok->type == TOKEN_SEMICOLON) {
-            advance(ps);
-            type = NODE_SEMICOLON;
-        } else if (tok->type == TOKEN_AND_IF) {
-            advance(ps);
-            type = NODE_AND;
-        } else if (tok->type == TOKEN_OR_IF) {
-            advance(ps);
-            type = NODE_OR;
-        } else {
+        
+        if (tok->type == TOKEN_FI || tok->type == TOKEN_ELSE) {
             break;
+        }
+        
+        /* if... */
+        if (tok->type == TOKEN_IF) {
+            advance(ps);
+            ASTNode *ifNode = parse_if(ps);
+            if (!ifNode) {
+                if (left) {
+                    free_ast(left);
+                }
+                return NULL;
+            }
+            if (!left) {
+                left = ifNode;
+            } else {
+                left = new_binary_node(NODE_SEMICOLON, left, ifNode);
+            }
+            continue;
         }
         
         ASTNode *right = parse_pipeline(ps);
         if (!right) {
-            free_ast(left);
+            if (left) {
+                free_ast(left);
+            }
             return NULL;
         }
-        left = new_binary_node(type, left, right);
+        
+        if (!left) {
+            left = right;
+        } else {
+            left = new_binary_node(NODE_SEMICOLON, left, right);
+        }
+        
+        tok = peek(ps);
+        if (!tok) {
+            break;
+        }
+        
+        if (tok->type == TOKEN_SEMICOLON || 
+            tok->type == TOKEN_AND_IF || 
+            tok->type == TOKEN_OR_IF) {
+            advance(ps);
+            continue;
+        }
+        
+        if (tok->type != TOKEN_IF && tok->type != TOKEN_ELSE && tok->type != TOKEN_FI) {
+            break;
+        }
     }
+    
     return left;
 }
 
@@ -149,6 +187,18 @@ static ASTNode *parse_command(ParserState *ps) {
         if (!tok || tok->type != TOKEN_WORD) {
             break;
         }
+
+        Token *next = peek_next(ps);
+        if (next && (next->type == TOKEN_THEN || 
+                     next->type == TOKEN_ELSE || 
+                     next->type == TOKEN_FI)) {
+
+            advance(ps);
+            argv = realloc(argv, (argc + 1) * sizeof(char *));
+            argv[argc++] = strdup(tok->value);
+            break;
+        }
+
         advance(ps);
         argv = realloc(argv, (argc + 1) * sizeof(char *));
         argv[argc++] = strdup(tok->value);
@@ -207,6 +257,63 @@ static ASTNode *parse_command(ParserState *ps) {
     return node;
 }
 
+static ASTNode *parse_if(ParserState *ps) {
+    ASTNode *node = calloc(1, sizeof(ASTNode));
+    if (!node) {
+        return NULL;
+    }
+    node->type = NODE_IF;
+
+    node->data.ifNode.condition = parse_pipeline(ps);
+    if (!node->data.ifNode.condition) {
+        fprintf(stderr, "Syntax error: expected condition after 'if'\n");
+        free(node);
+        return NULL;
+    }
+
+    /* allow optional ';' after condition */
+    match(ps, TOKEN_SEMICOLON);
+    
+    if (!match(ps, TOKEN_THEN)) {
+        fprintf(stderr, "Syntax error: expected `then`\n");
+        free_ast(node->data.ifNode.condition);
+        free(node);
+        return NULL;
+    }
+
+    node->data.ifNode.thenBranch = parse_list(ps);
+    if (!node->data.ifNode.thenBranch) {
+        free_ast(node->data.ifNode.condition);
+        free(node);
+        return NULL;
+    }
+    
+    /* check for `else` */
+    node->data.ifNode.elseBranch = NULL;
+    if (match(ps, TOKEN_ELSE)) {
+        node->data.ifNode.elseBranch = parse_list(ps);
+        if (!node->data.ifNode.elseBranch) {
+            free_ast(node->data.ifNode.condition);
+            free_ast(node->data.ifNode.thenBranch);
+            free(node);
+            return NULL;
+        }
+    }
+
+    if (!match(ps, TOKEN_FI)) {
+        fprintf(stderr, "Syntax error: expected 'fi'\n");
+        free_ast(node->data.ifNode.condition);
+        free_ast(node->data.ifNode.thenBranch);
+        if (node->data.ifNode.elseBranch) {
+            free_ast(node->data.ifNode.elseBranch);
+        }
+        free(node);
+        return NULL;
+    }
+    
+    return node;
+}
+
 void free_ast(ASTNode *node) {
     if (!node) {
         return;
@@ -225,15 +332,30 @@ void free_ast(ASTNode *node) {
         case NODE_PIPELINE:
         case NODE_AND:
         case NODE_OR:
-        case NODE_SEMICOLON:
+        case NODE_SEMICOLON: {
             free_ast(node->data.binary.left);
             free_ast(node->data.binary.right);
             break;
-            
-        case NODE_REDIRECT:
+        }
+
+        case NODE_REDIRECT: {
             free_ast(node->data.redirect.child);
             free(node->data.redirect.filename);
             break;
+        }
+
+        case NODE_IF: {
+            free_ast(node->data.ifNode.condition);
+            free_ast(node->data.ifNode.thenBranch);
+            if (node->data.ifNode.elseBranch) {
+                free_ast(node->data.ifNode.elseBranch);
+            }
+            break;
+        }
+
+        default: {
+            break;
+        }
     }
     free(node);
 }

@@ -16,6 +16,8 @@ typedef enum NodeType
     NODE_REDIRECT,
     NODE_AND,
     NODE_OR,
+    NODE_IF,
+    NODE_ELSE,
     NODE_SEMICOLON,
 } NodeType;
 
@@ -44,6 +46,13 @@ typedef struct ASTNode
             char *filename;
             int mode;
         } redirect;
+
+        struct
+        {
+            struct ASTNode *condition;
+            struct ASTNode *thenBranch;
+            struct ASTNode *elseBranch;
+        } ifNode;
     } data;
 } ASTNode;
 

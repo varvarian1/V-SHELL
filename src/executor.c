@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 #include "../include/executor.h"
 #include "../include/symbol.h"
@@ -27,12 +28,10 @@ int execute(ASTNode *node) {
     }
 
     switch (node->type) {
-        case NODE_COMMAND:
-            return execute_command(node);
-        case NODE_PIPELINE:
-            return execute_pipeline(node);
-        case NODE_REDIRECT:
-            return execute_redirect(node);
+        case NODE_COMMAND: { return execute_command(node); }
+        case NODE_PIPELINE: { return execute_pipeline(node); }
+        case NODE_REDIRECT: { return execute_redirect(node); }
+
         case NODE_AND: {
             int left_ret = execute(node->data.binary.left);
             if (left_ret != 0) {
@@ -47,12 +46,35 @@ int execute(ASTNode *node) {
             }
             return execute(node->data.binary.right);
         }
-        case NODE_SEMICOLON:
+        case NODE_IF: {
+            int conditionResult = execute(node->data.ifNode.condition);
+            if (conditionResult == 0) {
+                return execute(node->data.ifNode.thenBranch);
+            } else if (node->data.ifNode.elseBranch) {
+                return execute(node->data.ifNode.elseBranch);
+            }
+            return conditionResult;
+        }
+        case NODE_SEMICOLON: {
             execute(node->data.binary.left);
             return execute(node->data.binary.right);
-        default:
+        }
+        default: {
             return 0;
+        }
     }
+}
+
+static int is_executable_script(const char* path) {
+    if (!strchr(path, '/')) {
+        return 0;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return 0;
+    }
+    return S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR);
 }
 
 int execute_script(const char *filename, int argc, char **argv) {
@@ -65,46 +87,74 @@ int execute_script(const char *filename, int argc, char **argv) {
     set_positional_args(argc, argv);
     set_symbol("0", filename, 0);
 
+    char *content = NULL;
+    size_t contentSize = 0;
     char *line = NULL;
-    size_t len = 0;
-    ssize_t lineLength;
-    int lastStatus = 0;
-    
-    /* Read the next line from the script file.
-     * Returns number of characters read, or -1 on EOF/error. */
-    while ((lineLength = getline(&line, &len, file)) != -1) {
-        /* remove trailing newline */
-        if (lineLength > 0 && line[lineLength-1] == '\n') {
-            line[lineLength-1] = '\0';
-        }
+    size_t lineLen = 0;
+    ssize_t line_read;
 
-        /* skip empty lines */
-        if (line[0] == '\0') {
-            continue;
+    while ((line_read = getline(&line, &lineLen, file)) != -1) {
+        char *new_content = realloc(content, contentSize + line_read + 1);
+        if (!new_content) {
+            perror("realloc");
+            free(content);
+            free(line);
+            fclose(file);
+            return -1;
         }
-        
-        /* skip comments */
-        if (line[0] == '#') {
-            continue;
-        }
-
-        ASTNode *node = parse_line(line);
-        if (!node) {
-            fprintf(stderr, "Syntax error is script line: %s\n", line);
-            continue;
-        }
-
-        int status = execute(node);
-        free_ast(node);
-        if (status != 0) {
-            lastStatus = status; // remember last non-zero exit code
-        }
+        content = new_content;
+        memcpy(content + contentSize, line, line_read);
+        contentSize += line_read;
+        content[contentSize] = '\0';
     }
 
     free(line);
     fclose(file);
 
-    return lastStatus;
+    if (!content || contentSize == 0) {
+        free(content);
+        return 0;
+    }
+
+    /* skip shebang line if present */
+    char *start = content;
+    if (contentSize >= 2 && content[0] == '#' && content[1] == '!') {
+        start = strchr(content, '\n');
+        if (start) {
+            start++;  /* skip the newline character */
+        } else {
+            /* only shebang line, no actual script content */
+            free(content);
+            return 0;
+        }
+    }
+
+    if (!start || *start == '\0') {
+        free(content);
+        return 0;
+    }
+
+    int tokenCount = 0;
+    Token *tokens = tokenize(start, &tokenCount);
+    free(content);
+
+    if (!tokens || tokenCount == 0) {
+        return 0;
+    }
+
+    ASTNode *ast = parse(tokens, tokenCount);
+    if (!ast) {
+        fprintf(stderr, "Syntax error in script: %s\n", filename);
+        free_tokens(tokens, tokenCount);
+        return -1;
+    }
+
+    int status = execute(ast);
+    
+    free_ast(ast);
+    free_tokens(tokens, tokenCount);
+
+    return status;
 }
 
 static int execute_command(ASTNode *node) {
@@ -123,6 +173,12 @@ static int execute_command(ASTNode *node) {
     expanded_argv[argc] = NULL;
     char **argv = expanded_argv;
 
+    if (is_executable_script(argv[0])) {
+        int status = execute_script(argv[0], argc-1, &argv[1]);
+        free_expanded_argv(expanded_argv, argc);
+        return status;
+    }
+
     if (strcmp(argv[0], "exit") == 0) {
         int code;
         if ((argc > 1)) {
@@ -130,6 +186,7 @@ static int execute_command(ASTNode *node) {
         } else {
             code = 0;
         }
+        free_expanded_argv(expanded_argv, argc);
         exit(code);
     }
     if (strcmp(argv[0], "cd") == 0) {
@@ -185,6 +242,7 @@ static int execute_command(ASTNode *node) {
             }
         }
 
+        export_environment();
         free_expanded_argv(expanded_argv, argc);
         return 0;
     }
@@ -193,6 +251,7 @@ static int execute_command(ASTNode *node) {
             unset_symbol(argv[i]);
         }
 
+        export_environment();
         free_expanded_argv(expanded_argv, argc);
         return 0;
     }

@@ -67,6 +67,10 @@ typedef enum TokenType
     TOKEN_AMPERSAND,
     TOKEN_LPAREN,
     TOKEN_RPAREN,
+    TOKEN_IF,
+    TOKEN_THEN,
+    TOKEN_ELSE,
+    TOKEN_FI,
     TOKEN_EOF,
 } TokenType;
 

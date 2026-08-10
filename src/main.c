@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <limits.h>
 
 #include "../include/lexer.h"
 #include "../include/parser.h"
@@ -21,6 +22,12 @@ void handle_sigint(int sig) {
 }
 
 int main(int argc, char **argv) {
+    char shellPath[PATH_MAX];
+    if (realpath(argv[0], shellPath)) {
+        set_symbol("SHELL", shellPath, 1);
+        export_environment();
+    }
+
     import_environment();
 
     /* if a script file is given, execute it and exit */
