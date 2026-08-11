@@ -13,6 +13,11 @@ V-SHELL is a lightweight command-line interpreter (shell) written in C.
 - **Logical operators**:
 	- `&&` - execute the right side only if the left succeeds
 	- `||` - execute the right side only if the left fails
+- **Control structures**:
+	- Conditional statements (`if`/`then`/`else`/`fi`)
+	- For loop (`for var in list; do ... done`) with optional `in` and positional fallback
+- **History**: command history with `history` command stored in `~/.v-shell_history`
+- **Script execution**: run scripts with `./script.sh` or `v-shell script.sh` 
 
 ### Requirements
 
@@ -24,7 +29,7 @@ V-SHELL is a lightweight command-line interpreter (shell) written in C.
 
 ```bash
 git clone git@github.com:varvarian1/V-SHELL.git
-cd v-shell
+cd V-SHELL
 make all
 ```
 
