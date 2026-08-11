@@ -8,6 +8,7 @@ static ASTNode *parse_list(ParserState *ps);
 static ASTNode *parse_pipeline(ParserState *ps);
 static ASTNode *parse_command(ParserState *ps);
 static ASTNode *parse_if(ParserState *ps);
+static ASTNode *parse_for(ParserState *ps);
 
 /* returns current token without consuming it */
 static Token *peek(ParserState *ps) {
@@ -97,25 +98,24 @@ ASTNode *parse_line(const char *line) {
 
 static ASTNode *parse_list(ParserState *ps) {
     ASTNode *left = NULL;
-    
+
     while (1) {
         Token *tok = peek(ps);
         if (!tok) {
             break;
         }
-        
-        if (tok->type == TOKEN_FI || tok->type == TOKEN_ELSE) {
+
+        /* stop on fi, else, done, or EOF */
+        if (tok->type == TOKEN_FI || tok->type == TOKEN_ELSE || tok->type == TOKEN_DONE || tok->type == TOKEN_EOF) {
             break;
         }
-        
+
         /* if... */
         if (tok->type == TOKEN_IF) {
             advance(ps);
             ASTNode *ifNode = parse_if(ps);
             if (!ifNode) {
-                if (left) {
-                    free_ast(left);
-                }
+                if (left) free_ast(left);
                 return NULL;
             }
             if (!left) {
@@ -125,38 +125,52 @@ static ASTNode *parse_list(ParserState *ps) {
             }
             continue;
         }
-        
+
+        /* for... */
+        if (tok->type == TOKEN_FOR) {
+            advance(ps);
+            ASTNode *forNode = parse_for(ps);
+            if (!forNode) {
+                if (left) free_ast(left);
+                return NULL;
+            }
+            if (!left) {
+                left = forNode;
+            } else {
+                left = new_binary_node(NODE_SEMICOLON, left, forNode);
+            }
+            continue;
+        }
+
         ASTNode *right = parse_pipeline(ps);
         if (!right) {
-            if (left) {
-                free_ast(left);
-            }
+            if (left) free_ast(left);
             return NULL;
         }
-        
+
         if (!left) {
             left = right;
         } else {
             left = new_binary_node(NODE_SEMICOLON, left, right);
         }
-        
+
         tok = peek(ps);
         if (!tok) {
             break;
         }
-        
-        if (tok->type == TOKEN_SEMICOLON || 
-            tok->type == TOKEN_AND_IF || 
+
+        if (tok->type == TOKEN_SEMICOLON ||
+            tok->type == TOKEN_AND_IF ||
             tok->type == TOKEN_OR_IF) {
             advance(ps);
             continue;
         }
-        
-        if (tok->type != TOKEN_IF && tok->type != TOKEN_ELSE && tok->type != TOKEN_FI) {
+
+        if (tok->type != TOKEN_IF && tok->type != TOKEN_ELSE && tok->type != TOKEN_FI && tok->type != TOKEN_DONE && tok->type != TOKEN_EOF) {
             break;
         }
     }
-    
+
     return left;
 }
 
@@ -314,6 +328,70 @@ static ASTNode *parse_if(ParserState *ps) {
     return node;
 }
 
+static ASTNode *parse_for(ParserState *ps) {
+    Token *varTok = peek(ps);
+    if (!varTok || varTok->type != TOKEN_WORD) {
+        fprintf(stderr, "Syntax error: expected variable name after 'for'\n");
+        return NULL;
+    }
+    advance(ps); // consume variable name
+
+    ASTNode *node = calloc(1, sizeof(ASTNode));
+    if (!node) {
+        return NULL;
+    }
+
+    node->type = NODE_FOR;
+    node->data.forNode.varName = strdup(varTok->value);
+    node->data.forNode.wordList = NULL;
+    node->data.forNode.wordCount = 0;
+    node->data.forNode.body = NULL;
+    
+    /* optional 'in' keyword */
+    if (match(ps, TOKEN_IN)) {
+        /* collect words until 'do' */
+        while (1) {
+            Token *tok = peek(ps);
+            if (!tok || tok->type == TOKEN_DO || tok->type == TOKEN_SEMICOLON) {
+                break;
+            }
+            if (tok->type != TOKEN_WORD) {
+                fprintf(stderr, "Syntax error: expected word in list\n");
+                free_ast(node);
+                return NULL;
+            }
+            advance(ps);
+            node->data.forNode.wordList = realloc(node->data.forNode.wordList,
+                (node->data.forNode.wordCount + 1) * sizeof(char*));
+            node->data.forNode.wordList[node->data.forNode.wordCount++] = strdup(tok->value);
+        }
+    }
+    
+    /* optional ';' before 'do' */
+    match(ps, TOKEN_SEMICOLON);
+
+    if (!match(ps, TOKEN_DO)) {
+        fprintf(stderr, "Syntax error: expected 'do'\n");
+        free_ast(node);
+        return NULL;
+    }
+
+    node->data.forNode.body = parse_list(ps);
+    if (!node->data.forNode.body) {
+        free_ast(node);
+        return NULL;
+    }
+
+    if (!match(ps, TOKEN_DONE)) {
+        fprintf(stderr, "Syntax error: expected 'done'\n");
+        free_ast(node->data.forNode.body);
+        free_ast(node);
+        return NULL;
+    }
+
+    return node;
+}
+
 void free_ast(ASTNode *node) {
     if (!node) {
         return;
@@ -350,6 +428,17 @@ void free_ast(ASTNode *node) {
             if (node->data.ifNode.elseBranch) {
                 free_ast(node->data.ifNode.elseBranch);
             }
+            break;
+        }
+        
+        case NODE_FOR: {
+            free(node->data.forNode.varName);
+            for (int i = 0; i < node->data.forNode.wordCount; i++) {
+                free(node->data.forNode.wordList[i]);
+            }
+            
+            free(node->data.forNode.wordList);
+            free_ast(node->data.forNode.body);
             break;
         }
 

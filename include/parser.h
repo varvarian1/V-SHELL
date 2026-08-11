@@ -18,6 +18,7 @@ typedef enum NodeType
     NODE_OR,
     NODE_IF,
     NODE_ELSE,
+    NODE_FOR,
     NODE_SEMICOLON,
 } NodeType;
 
@@ -53,6 +54,14 @@ typedef struct ASTNode
             struct ASTNode *thenBranch;
             struct ASTNode *elseBranch;
         } ifNode;
+
+        struct
+        {
+            char *varName;
+            char **wordList;
+            int wordCount;
+            struct ASTNode *body;
+        } forNode;
     } data;
 } ASTNode;
 

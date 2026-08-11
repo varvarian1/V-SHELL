@@ -294,15 +294,20 @@ finish:
 static TokenType get_keyword_type(const char *word) {
     if (strcmp(word, "if") == 0) {
         return TOKEN_IF;
-    }
-    if (strcmp(word, "then") == 0) {
+    } else if (strcmp(word, "then") == 0) {
         return TOKEN_THEN;
-    }
-    if (strcmp(word, "else") == 0) {
+    } else if (strcmp(word, "else") == 0) {
         return TOKEN_ELSE;
-    }
-    if (strcmp(word, "fi") == 0) {
+    } else if (strcmp(word, "fi") == 0) {
         return TOKEN_FI;
+    } else if (strcmp(word, "for") == 0) {
+        return TOKEN_FOR;
+    } else if (strcmp(word, "in") == 0) {
+        return TOKEN_IN;
+    } else if (strcmp(word, "do") == 0) {
+        return TOKEN_DO;
+    } else if (strcmp(word, "done") == 0) {
+        return TOKEN_DONE;
     }
     return TOKEN_WORD;
 }

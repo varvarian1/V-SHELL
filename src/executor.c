@@ -59,6 +59,35 @@ int execute(ASTNode *node) {
             execute(node->data.binary.left);
             return execute(node->data.binary.right);
         }
+        case NODE_FOR: {
+            ASTNode *forNode = node;
+            int status = 0;
+
+            /* if no word list, iterate over positional parameters ($@) */
+            if (forNode->data.forNode.wordCount == 0) {
+                int count = get_positional_argc();
+                for (int i = 1; i <= count; i++) {
+                    char *val = get_positional_arg(i);
+                    set_symbol(forNode->data.forNode.varName, val ? val : "", 0);
+                    status = execute(forNode->data.forNode.body);
+                    if (status != 0) {
+                        break;
+                    }
+                }
+            } else {
+                for (int i = 0; i < forNode->data.forNode.wordCount; i++) {
+                    set_symbol(forNode->data.forNode.varName,
+                               forNode->data.forNode.wordList[i], 0);
+                    status = execute(forNode->data.forNode.body);
+                    if (status != 0) {
+                        break;
+                    }
+                }
+            }
+
+            return status;
+        }
+
         default: {
             return 0;
         }

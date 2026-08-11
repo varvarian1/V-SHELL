@@ -71,7 +71,11 @@ typedef enum TokenType
     TOKEN_THEN,
     TOKEN_ELSE,
     TOKEN_FI,
-    TOKEN_EOF,
+    TOKEN_FOR,
+    TOKEN_IN,
+    TOKEN_DO,
+    TOKEN_DONE,
+    TOKEN_EOF
 } TokenType;
 
 typedef struct Token
