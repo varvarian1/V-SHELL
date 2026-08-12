@@ -19,6 +19,7 @@ typedef enum NodeType
     NODE_IF,
     NODE_ELSE,
     NODE_FOR,
+    NODE_WHILE,
     NODE_SEMICOLON,
 } NodeType;
 
@@ -62,6 +63,12 @@ typedef struct ASTNode
             int wordCount;
             struct ASTNode *body;
         } forNode;
+
+        struct
+        {
+            struct ASTNode *condition;
+            struct ASTNode *body;
+        } whileNode;
     } data;
 } ASTNode;
 

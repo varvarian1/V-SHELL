@@ -72,6 +72,7 @@ typedef enum TokenType
     TOKEN_ELSE,
     TOKEN_FI,
     TOKEN_FOR,
+    TOKEN_WHILE,
     TOKEN_IN,
     TOKEN_DO,
     TOKEN_DONE,

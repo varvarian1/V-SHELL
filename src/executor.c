@@ -87,6 +87,23 @@ int execute(ASTNode *node) {
 
             return status;
         }
+        
+        case NODE_WHILE: {
+            int status = 0;
+            while (1) {
+                int condition = execute(node->data.whileNode.condition);
+                if (condition != 0) {
+                    break;
+                }
+
+                status = execute(node->data.whileNode.body);
+                if (status != 0) {
+                    break;
+                }
+            }
+
+            return status;
+        }
 
         default: {
             return 0;

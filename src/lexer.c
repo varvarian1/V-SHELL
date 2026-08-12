@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 
 #include "../include/lexer.h"
 
@@ -302,6 +303,8 @@ static TokenType get_keyword_type(const char *word) {
         return TOKEN_FI;
     } else if (strcmp(word, "for") == 0) {
         return TOKEN_FOR;
+    } else if (strcmp(word, "while") == 0) {
+        return TOKEN_WHILE;
     } else if (strcmp(word, "in") == 0) {
         return TOKEN_IN;
     } else if (strcmp(word, "do") == 0) {

@@ -9,6 +9,7 @@ static ASTNode *parse_pipeline(ParserState *ps);
 static ASTNode *parse_command(ParserState *ps);
 static ASTNode *parse_if(ParserState *ps);
 static ASTNode *parse_for(ParserState *ps);
+static ASTNode *parse_while(ParserState *ps);
 
 /* returns current token without consuming it */
 static Token *peek(ParserState *ps) {
@@ -138,6 +139,24 @@ static ASTNode *parse_list(ParserState *ps) {
                 left = forNode;
             } else {
                 left = new_binary_node(NODE_SEMICOLON, left, forNode);
+            }
+            continue;
+        }
+        
+        /* while... */
+        if (tok->type == TOKEN_WHILE) {
+            advance(ps);
+            ASTNode *whileNode = parse_while(ps);
+            if (!whileNode) {
+                if (left) {
+                    free_ast(left);
+                }
+                return NULL;
+            }
+            if (!left) {
+                left = whileNode;
+            } else {
+                left = new_binary_node(NODE_SEMICOLON, left, whileNode);
             }
             continue;
         }
@@ -392,6 +411,51 @@ static ASTNode *parse_for(ParserState *ps) {
     return node;
 }
 
+static ASTNode *parse_while(ParserState *ps) {
+    ASTNode *node = calloc(1, sizeof(ASTNode));
+    if (!node) {
+        return NULL;
+    }
+
+    node->type = NODE_WHILE;
+    node->data.whileNode.condition = parse_pipeline(ps);
+    if (!node->data.whileNode.condition) {
+        free(node);
+        return NULL;
+    }
+    
+    /* optional ';' after condition */
+    match(ps, TOKEN_SEMICOLON);
+    
+    if (!match(ps, TOKEN_DO)) {
+        fprintf(stderr, "Syntax error: expected 'do'\n");    
+        
+        free_ast(node->data.whileNode.condition);
+        free(node);
+    
+        return NULL;
+    }
+
+    node->data.whileNode.body = parse_list(ps);
+    if (!node->data.whileNode.body) {
+        free_ast(node->data.whileNode.condition);
+        free(node);
+
+        return NULL;
+    }
+    if (!match(ps, TOKEN_DONE)) {
+        fprintf(stderr, "Syntax error: expected 'done'\n");
+        
+        free_ast(node->data.whileNode.condition);
+        free_ast(node->data.whileNode.body);
+        free(node);
+
+        return NULL;
+    }
+
+    return node;
+}
+
 void free_ast(ASTNode *node) {
     if (!node) {
         return;
@@ -439,6 +503,12 @@ void free_ast(ASTNode *node) {
             
             free(node->data.forNode.wordList);
             free_ast(node->data.forNode.body);
+            break;
+        }
+        
+        case NODE_WHILE: {
+            free_ast(node->data.whileNode.condition);
+            free_ast(node->data.whileNode.body);
             break;
         }
 
