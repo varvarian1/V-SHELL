@@ -246,31 +246,6 @@ static int execute_command(ASTNode *node) {
         free_expanded_argv(expanded_argv, argc);
         return 0;
     }
-    if (strcmp(argv[0], "echo") == 0) {
-        for (int i = 1; i < argc; i++) {
-            printf("%s", argv[i]);
-            if (i + 1 < argc)
-                printf(" ");
-        }
-        printf("\n");
-        
-        free_expanded_argv(expanded_argv, argc);
-        return 0;
-    }
-    if (strcmp(argv[0], "pwd") == 0) {
-        char *cwd = getcwd(NULL, 0);
-        if (cwd) {
-            printf("%s\n", cwd);
-            free(cwd);
-        } else {
-            perror("pwd");
-            free_expanded_argv(expanded_argv, argc);
-            return 1;
-        }
-        
-        free_expanded_argv(expanded_argv, argc);
-        return 0;
-    }
     if (strcmp(argv[0], "history") == 0) {
         show_shell_history();
         free_expanded_argv(expanded_argv, argc);
