@@ -11,6 +11,9 @@
 #include "../include/symbol.h"
 #include "../include/history.h"
 
+#define BREAK_CODE      -2
+#define CONTINUE_CODE   -3
+
 /* Base value for exit status when a process is terminated by a signal.
  * Status = 128 + signal_number (as in POSIX shells).
  */
@@ -34,34 +37,74 @@ int execute(ASTNode *node) {
 
         case NODE_AND: {
             int left_ret = execute(node->data.binary.left);
+            if (left_ret == BREAK_CODE || left_ret == CONTINUE_CODE) {
+                return left_ret;
+            }
             if (left_ret != 0) {
                 return left_ret;
             }
-            return execute(node->data.binary.right);
+
+            int right_ret = execute(node->data.binary.right);
+            if (right_ret == BREAK_CODE || right_ret == CONTINUE_CODE) {
+                return right_ret;
+            }
+
+            return right_ret;
         }
         case NODE_OR: {
             int left_ret = execute(node->data.binary.left);
+            if (left_ret == BREAK_CODE || left_ret == CONTINUE_CODE) {
+                return left_ret;
+            }
             if (left_ret == 0) {
                 return 0;
             }
-            return execute(node->data.binary.right);
+
+            int right_ret = execute(node->data.binary.right);
+            if (right_ret == BREAK_CODE || right_ret == CONTINUE_CODE) {
+                return right_ret;
+            }
+
+            return right_ret;
         }
         case NODE_IF: {
-            int conditionResult = execute(node->data.ifNode.condition);
-            if (conditionResult == 0) {
-                return execute(node->data.ifNode.thenBranch);
-            } else if (node->data.ifNode.elseBranch) {
-                return execute(node->data.ifNode.elseBranch);
+            int condition = execute(node->data.ifNode.condition);
+            if (condition == BREAK_CODE || condition == CONTINUE_CODE) {
+                return condition;
             }
-            return conditionResult;
+            if (condition == 0) {
+                int then_ret = execute(node->data.ifNode.thenBranch);
+                if (then_ret == BREAK_CODE || then_ret == CONTINUE_CODE) {
+                    return then_ret;
+                }
+                return then_ret;
+            } else if (node->data.ifNode.elseBranch) {
+                int else_ret = execute(node->data.ifNode.elseBranch);
+                if (else_ret == BREAK_CODE || else_ret == CONTINUE_CODE) {
+                    return else_ret;
+                }
+                return else_ret;
+            }
+
+            return condition;
         }
         case NODE_SEMICOLON: {
-            execute(node->data.binary.left);
-            return execute(node->data.binary.right);
+            int left_ret = execute(node->data.binary.left);
+            if (left_ret == BREAK_CODE || left_ret == CONTINUE_CODE) {
+                return left_ret;
+            }
+
+            int right_ret = execute(node->data.binary.right);
+            if (right_ret == BREAK_CODE || right_ret == CONTINUE_CODE) {
+                return right_ret;
+            }
+
+            return right_ret;
         }
         case NODE_FOR: {
             ASTNode *forNode = node;
             int status = 0;
+            int lastStatus = 0;
 
             /* if no word list, iterate over positional parameters ($@) */
             if (forNode->data.forNode.wordCount == 0) {
@@ -70,8 +113,14 @@ int execute(ASTNode *node) {
                     char *val = get_positional_arg(i);
                     set_symbol(forNode->data.forNode.varName, val ? val : "", 0);
                     status = execute(forNode->data.forNode.body);
-                    if (status != 0) {
+                    if (status == BREAK_CODE) {
                         break;
+                    }
+                    if (status == CONTINUE_CODE) {
+                        continue;
+                    }
+                    if (status != 0) {
+                        lastStatus = status;
                     }
                 }
             } else {
@@ -79,17 +128,24 @@ int execute(ASTNode *node) {
                     set_symbol(forNode->data.forNode.varName,
                                forNode->data.forNode.wordList[i], 0);
                     status = execute(forNode->data.forNode.body);
-                    if (status != 0) {
+                    if (status == BREAK_CODE) {
                         break;
+                    }
+                    if (status == CONTINUE_CODE) {
+                        continue;
+                    }
+                    if (status != 0) {
+                        lastStatus = status;
                     }
                 }
             }
 
-            return status;
+            return (status == BREAK_CODE) ? 0 : lastStatus;
         }
         
         case NODE_WHILE: {
             int status = 0;
+            int lastStatus = 0;
             while (1) {
                 int condition = execute(node->data.whileNode.condition);
                 if (condition != 0) {
@@ -97,12 +153,18 @@ int execute(ASTNode *node) {
                 }
 
                 status = execute(node->data.whileNode.body);
-                if (status != 0) {
+                if (status == BREAK_CODE) {
                     break;
+                }
+                if (status == CONTINUE_CODE) {
+                    continue;
+                }
+                if (status != 0) {
+                    lastStatus = status;
                 }
             }
 
-            return status;
+            return (status == BREAK_CODE) ? 0 : lastStatus;
         }
 
         default: {
@@ -275,6 +337,15 @@ static int execute_command(ASTNode *node) {
         export_environment();
         free_expanded_argv(expanded_argv, argc);
         return 0;
+    }
+
+    if (strcmp(argv[0], "break") == 0) {
+        free_expanded_argv(expanded_argv, argc);
+        return BREAK_CODE;
+    }
+    if (strcmp(argv[0], "continue") == 0) {
+        free_expanded_argv(expanded_argv, argc);
+        return CONTINUE_CODE;
     }
 
     pid_t pid = fork();
