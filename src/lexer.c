@@ -305,6 +305,8 @@ static TokenType get_keyword_type(const char *word) {
         return TOKEN_FOR;
     } else if (strcmp(word, "while") == 0) {
         return TOKEN_WHILE;
+    } else if (strcmp(word, "until") == 0) {
+        return TOKEN_UNTIL;
     } else if (strcmp(word, "in") == 0) {
         return TOKEN_IN;
     } else if (strcmp(word, "do") == 0) {

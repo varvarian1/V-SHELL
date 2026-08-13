@@ -10,6 +10,7 @@ static ASTNode *parse_command(ParserState *ps);
 static ASTNode *parse_if(ParserState *ps);
 static ASTNode *parse_for(ParserState *ps);
 static ASTNode *parse_while(ParserState *ps);
+static ASTNode *parse_until(ParserState *ps);
 
 /* returns current token without consuming it */
 static Token *peek(ParserState *ps) {
@@ -157,6 +158,24 @@ static ASTNode *parse_list(ParserState *ps) {
                 left = whileNode;
             } else {
                 left = new_binary_node(NODE_SEMICOLON, left, whileNode);
+            }
+            continue;
+        }
+
+        /* until... */
+        if (tok->type == TOKEN_UNTIL) {
+            advance(ps);
+            ASTNode *untilNode = parse_until(ps);
+            if (!untilNode) {
+                if (left) {
+                    free_ast(left);
+                }
+                return NULL;
+            }
+            if (!left) {
+                left = untilNode;
+            } else {
+                left = new_binary_node(NODE_SEMICOLON, left, untilNode);
             }
             continue;
         }
@@ -456,6 +475,50 @@ static ASTNode *parse_while(ParserState *ps) {
     return node;
 }
 
+static ASTNode *parse_until(ParserState *ps) {
+    ASTNode *node = calloc(1, sizeof(ASTNode));
+    if (!node) {
+        return NULL;
+    }
+
+    node->type = NODE_UNTIL;
+    node->data.whileNode.condition = parse_pipeline(ps);
+    if (!node->data.whileNode.condition) {
+        free(node);
+        return NULL;
+    }
+
+    /* optional ';' after condition */
+    match(ps, TOKEN_SEMICOLON);
+
+    if (!match(ps, TOKEN_DO)) {
+        fprintf(stderr, "Syntax error: expected 'do'\n");
+        free_ast(node->data.whileNode.condition);
+        free(node);
+
+        return NULL;
+    }
+
+    node->data.whileNode.body = parse_list(ps);
+    if (!node->data.whileNode.body) {
+        free_ast(node->data.whileNode.condition);
+        free(node);
+
+        return NULL;
+    }
+
+    if (!match(ps, TOKEN_DONE)) {
+        fprintf(stderr, "Syntax error: expected 'done'\n");
+        free_ast(node->data.whileNode.condition);
+        free_ast(node->data.whileNode.body);
+        free(node);
+
+        return NULL;
+    }
+
+    return node;
+}
+
 void free_ast(ASTNode *node) {
     if (!node) {
         return;
@@ -506,11 +569,11 @@ void free_ast(ASTNode *node) {
             break;
         }
         
-        case NODE_WHILE: {
+        case NODE_WHILE:
+        case NODE_UNTIL:
             free_ast(node->data.whileNode.condition);
             free_ast(node->data.whileNode.body);
             break;
-        }
 
         default: {
             break;

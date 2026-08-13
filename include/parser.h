@@ -20,6 +20,7 @@ typedef enum NodeType
     NODE_ELSE,
     NODE_FOR,
     NODE_WHILE,
+    NODE_UNTIL,
     NODE_SEMICOLON,
 } NodeType;
 

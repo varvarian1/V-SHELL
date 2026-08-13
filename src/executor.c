@@ -166,7 +166,29 @@ int execute(ASTNode *node) {
 
             return (status == BREAK_CODE) ? 0 : lastStatus;
         }
+        case NODE_UNTIL: {
+            int status = 0;
+            int lastStatus = 0;
+            while (1) {
+                int condition = execute(node->data.whileNode.condition);
+                if (condition == 0) {
+                    break;
+                }
 
+                status = execute(node->data.whileNode.body);
+                if (status == BREAK_CODE) {
+                    break;
+                }
+                if (status == CONTINUE_CODE) {
+                    continue;
+                }
+                if (status != 0) {
+                    lastStatus = status;
+                }
+            }
+
+            return (status == BREAK_CODE) ? 0 : lastStatus;
+        }
         default: {
             return 0;
         }
