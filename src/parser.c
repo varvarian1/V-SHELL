@@ -212,6 +212,59 @@ static ASTNode *parse_list(ParserState *ps) {
     return left;
 }
 
+static ASTNode *parse_condition(ParserState *ps) {
+    ASTNode *left = NULL;
+
+    while (1) {
+        Token *tok = peek(ps);
+        if (!tok) {
+            break;
+        }
+
+        if (tok->type == TOKEN_FI || tok->type == TOKEN_ELSE || tok->type == TOKEN_DONE || tok->type == TOKEN_EOF) {
+            break;
+        }
+
+        if (tok->type == TOKEN_IF) {
+            fprintf(stderr, "Syntax error: nested if not allowed in condition\n");
+            if (left){
+                free_ast(left);
+            }
+            
+            return NULL;
+        }
+
+        ASTNode *right = parse_pipeline(ps);
+        if (!right) {
+            if (left) {
+                free_ast(left);
+            }
+
+            return NULL;
+        }
+
+        if (!left) {
+            left = right;
+        } else {
+            left = new_binary_node(NODE_SEMICOLON, left, right);
+        }
+
+        tok = peek(ps);
+        if (!tok) {
+            break;
+        }
+
+        if (tok->type == TOKEN_AND_IF || tok->type == TOKEN_OR_IF) {
+            advance(ps);
+            continue;
+        }
+
+        break;
+    }
+
+    return left;
+}
+
 static ASTNode *parse_pipeline(ParserState *ps) {
     ASTNode *left = parse_command(ps);
     if (!left) {
@@ -316,7 +369,7 @@ static ASTNode *parse_if(ParserState *ps) {
     }
     node->type = NODE_IF;
 
-    node->data.ifNode.condition = parse_pipeline(ps);
+    node->data.ifNode.condition = parse_condition(ps);
     if (!node->data.ifNode.condition) {
         fprintf(stderr, "Syntax error: expected condition after 'if'\n");
         free(node);

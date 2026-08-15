@@ -1,11 +1,20 @@
 #!/usr/local/bin/v-shell
 
-if [ -f /etc/passwd ]; then
-    if [ -r /etc/passwd ]; then
-        echo "PASS: /etc/passwd is a readable file"
-    else
-        echo "FAIL: /etc/passwd is not readable"
-    fi
+echo "=== Test condition with && ==="
+if [ -f /etc/passwd ] && [ -r /etc/passwd ]; then
+    echo "PASS: file exists and readable"
 else
-    echo "FAIL: /etc/passwd not found"
+    echo "FAIL"
+fi
+
+echo "=== Test condition with || ==="
+if [ -f /nonexistent ] || [ -f /etc/passwd ]; then
+    echo "PASS: at least one file exists"
+else
+    echo "FAIL"
+fi
+
+echo "=== Test condition with ; (should fail) ==="
+if [ -f /etc/passwd ]; then
+    echo "PASS: simple if"
 fi
